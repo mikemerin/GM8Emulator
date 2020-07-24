@@ -10,6 +10,13 @@ use shared::{
     types::{Colour, ID},
 };
 use std::{net::TcpStream, path::PathBuf};
+use std::fs::File;
+// use std::io::prelude::*;
+use std::io::Read;
+// use std::fs;
+use std::any::type_name;
+
+use std::collections::HashMap;
 
 const WINDOW_WIDTH: u32 = 350;
 const WINDOW_HEIGHT: u32 = 750;
@@ -42,7 +49,7 @@ pub struct ControlPanel {
     pub game_mouse_pos: (f64, f64),
     pub client_mouse_pos: (i32, i32),
 
-    advance_button_normal: AtlasRef,
+    button_images: HashMap<String, AtlasRef>,
     big_save_button_normal: AtlasRef,
     key_button_l_neutral: AtlasRef,
     key_button_l_held: AtlasRef,
@@ -61,6 +68,24 @@ pub struct ControlPanel {
 
     pub read_buffer: Vec<u8>,
     pub project_dir: PathBuf,
+}
+
+#[derive(Clone, Copy)]
+pub struct Buttons {
+    advance_button_normal: AtlasRef,
+    // big_save_button_normal: AtlasRef,
+    // key_button_l_neutral: AtlasRef,
+    // key_button_l_held: AtlasRef,
+    // key_button_r_neutral: AtlasRef,
+    // key_button_r_neutral2: AtlasRef,
+    // key_button_r_neutral3: AtlasRef,
+    // key_button_r_held: AtlasRef,
+    // key_button_r_held2: AtlasRef,
+    // key_button_r_held3: AtlasRef,
+    // mouse_pos_normal: AtlasRef,
+    // save_button_active: AtlasRef,
+    // save_button_inactive: AtlasRef,
+    // button_outline: AtlasRef,
 }
 
 #[derive(Clone)]
@@ -192,7 +217,27 @@ impl ControlPanel {
         )?;
 
         let mut atlases = AtlasBuilder::new(1024);
-        let advance_button_normal = Self::upload_bmp(&mut atlases, include_bytes!("images/advance.bmp"));
+        let mut button_images = HashMap::new();
+
+        let button_names = ["advance_button_normal"];
+
+        fn type_of<T>(_: T) -> &'static str {
+            type_name::<T>()
+        }
+
+        for name in button_names.iter() {
+            let path = format!("../../control-panel/images/{}.bmp", name.to_string());
+            eprintln!("{}", &path);
+            let mut file = File::open(&path)?;
+            let mut file_content = Vec::new();
+            file.read_to_end(&mut file_content)?;
+
+            button_images.insert(
+                name.to_string(),
+                Self::upload_bmp(&mut atlases, &file_content),
+            );
+        };
+
         let big_save_button_normal = Self::upload_bmp(&mut atlases, include_bytes!("images/save_main.bmp"));
         let key_button_l_neutral = Self::upload_bmp(&mut atlases, include_bytes!("images/KeyBtnLNeutral.bmp"));
         let key_button_l_held = Self::upload_bmp(&mut atlases, include_bytes!("images/KeyBtnLHeld.bmp"));
@@ -313,7 +358,8 @@ impl ControlPanel {
             game_mouse_pos: (0.0, 0.0),
             client_mouse_pos: (0, 0),
 
-            advance_button_normal,
+            button_images,
+
             big_save_button_normal,
             key_button_l_neutral,
             key_button_l_held,
@@ -744,16 +790,19 @@ impl ControlPanel {
         draw_text(&mut self.renderer, "Frame:", 4.0, 19.0, &self.font, 0, 1.0);
         draw_text(&mut self.renderer, &self.frame_count.to_string(), 4.0, 32.0, &self.font, 0, 1.0);
 
-        self.renderer.draw_sprite(
-            &self.advance_button_normal,
-            self.advance_button.x.into(),
-            self.advance_button.y.into(),
-            1.0,
-            1.0,
-            0.0,
-            0xFFFFFF,
-            if self.advance_button.contains_point(self.mouse_x, self.mouse_y) { 1.0 } else { 0.8 },
-        );
+        let atlas_ref = &self.button_images.get("advance_button_normal");
+        if let Some(values) = atlas_ref {
+            self.renderer.draw_sprite(
+                values,
+                self.advance_button.x.into(),
+                self.advance_button.y.into(),
+                1.0,
+                1.0,
+                0.0,
+                0xFFFFFF,
+                if self.advance_button.contains_point(self.mouse_x, self.mouse_y) { 1.0 } else { 0.8 },
+            );
+        };
 
         for button in self.key_buttons.iter() {
             let alpha = if button.contains_point(self.mouse_x, self.mouse_y) { 1.0 } else { 0.6 };
